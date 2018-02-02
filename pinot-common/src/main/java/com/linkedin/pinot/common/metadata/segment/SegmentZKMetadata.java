@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,17 +37,19 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   private static final String NULL = "null";
 
-  private String _segmentName = null;
-  private String _tableName = null;
-  private SegmentType _segmentType = null;
+  private String _segmentName;
+  private String _tableName;
+  private SegmentType _segmentType;
   private long _startTime = -1;
   private long _endTime = -1;
-  private TimeUnit _timeUnit = null;
-  private String _indexVersion = null;
+  private TimeUnit _timeUnit;
+  private Interval _timeInterval;
+  private Duration _timeGranularity;
+  private String _indexVersion;
   private long _totalRawDocs = -1;
   private long _crc = -1;
   private long _creationTime = -1;
-  private SegmentPartitionMetadata _partitionMetadata = null;
+  private SegmentPartitionMetadata _partitionMetadata;
   private long _segmentUploadStartTime = -1;
   private Map<String, String> _customMap;
 
@@ -61,6 +65,13 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) && !znRecord.getSimpleField(
         CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
       _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+
+      // For consuming segment, end time might not be set
+      if (_startTime <= _endTime) {
+        _timeInterval = new Interval(_timeUnit.toMillis(_startTime), _timeUnit.toMillis(_endTime));
+      }
+
+      _timeGranularity = new Duration(_timeUnit.toMillis(1));
     }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
     _totalRawDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
@@ -119,6 +130,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   public void setTimeUnit(TimeUnit timeUnit) {
     _timeUnit = timeUnit;
+  }
+
+  public Interval getTimeInterval() {
+    return _timeInterval;
+  }
+
+  public Duration getTimeGranularity() {
+    return _timeGranularity;
   }
 
   public String getIndexVersion() {
